@@ -29,6 +29,8 @@ scanner ataca.
 | **44 testes unitários** no código do pipeline | cobrem o filtro que decide o que atacar |
 | **6 defeitos corrigidos** no projeto de base  | 5 deles silenciosos                     |
 
+![Saida do comando de scan: as sete fases do pipeline, importacao do HAR aceita pelo ZAP e o resumo final com 235 alertas, sendo 2 altos, 2 baixos e 1 informativo](docs/assets/scan-owasp-zap.png)
+
 Um scan completo leva cerca de **10 minutos** e roda inteiro na sua máquina,
 contra um alvo que sobe junto do projeto.
 
