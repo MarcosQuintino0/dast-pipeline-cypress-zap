@@ -14,6 +14,7 @@ opened in any browser.
 
 from datetime import datetime
 from pathlib import Path
+
 from loguru import logger
 from zapv2 import ZAPv2  # type: ignore[import-untyped]
 

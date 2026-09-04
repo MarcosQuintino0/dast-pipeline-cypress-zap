@@ -30,9 +30,9 @@ WHY TOKENIZE?
 - Replacing with {{AUTO_INT}} allows generating unique values
 """
 
-import json
 import glob
-from enum import Enum
+import json
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -43,7 +43,7 @@ from pydantic import BaseModel, ValidationError
 from security_tests.config import settings
 
 
-class HTTPMethod(str, Enum):
+class HTTPMethod(StrEnum):
     GET = "GET"
     POST = "POST"
     PUT = "PUT"
@@ -52,17 +52,20 @@ class HTTPMethod(str, Enum):
 
 class MinimalRequest(BaseModel):
     """Minimum model a request must have in the HAR."""
+
     method: HTTPMethod
     url: str
 
 
 class MinimalResponse(BaseModel):
     """Minimum model a response must have in the HAR."""
+
     status: int
 
 
 class MinimalEntry(BaseModel):
     """A HAR entry is a request+response pair."""
+
     request: MinimalRequest
     response: MinimalResponse
 
@@ -85,7 +88,7 @@ def load_hars(folder: Path | None = None) -> list[dict[str, Any]]:
     hars: list[dict[str, Any]] = []
     for filepath in files:
         logger.info(f"Loading HAR: {filepath}")
-        with open(filepath, "r", encoding="utf-8") as f:
+        with open(filepath, encoding="utf-8") as f:
             hars.append(json.load(f))
 
     logger.info(f"Total HARs loaded: {len(hars)}")
@@ -207,9 +210,7 @@ def tokenize_entry(entry: dict[str, Any]) -> dict[str, Any]:
     for field in settings.FIELDS_TO_TOKENIZE:
         if field in body:
             value = body[field]
-            if isinstance(value, (int, float)) or (
-                isinstance(value, str) and value.isdigit()
-            ):
+            if isinstance(value, (int, float)) or (isinstance(value, str) and value.isdigit()):
                 body[field] = "{{AUTO_INT}}"
                 modified = True
 
@@ -286,10 +287,7 @@ def filter_and_deduplicate_entries(entries: list[dict[str, Any]]) -> list[dict[s
 
         result.append(entry)
 
-    logger.info(
-        f"Entries after filtering: {len(result)} "
-        f"(removed: {len(entries) - len(result)})"
-    )
+    logger.info(f"Entries after filtering: {len(result)} (removed: {len(entries) - len(result)})")
     return result
 
 

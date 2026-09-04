@@ -25,31 +25,28 @@ PREREQUISITES:
 from loguru import logger
 
 from security_tests.config import assert_target_is_allowed, settings
-from security_tests.zap_scan.zap_client import (
-    create_zap_client,
-    test_connection,
-    create_clean_session,
-    ensure_zap_mode,
+from security_tests.har.zap_integration import (
+    extract_targets_from_har,
+    import_har_into_zap,
+    validate_har_file,
+    wait_for_passive_scan,
 )
 from security_tests.zap_scan.context import apply_technology_allowlist
+from security_tests.zap_scan.report import (
+    display_alert_summary,
+    generate_html_report,
+)
+from security_tests.zap_scan.scan_execution import run_scan_on_endpoint
 from security_tests.zap_scan.scan_policy import (
-    configure_scan_policy,
     configure_ascan_options,
+    configure_scan_policy,
 )
 from security_tests.zap_scan.script_randomizer import load_and_enable_script
-from security_tests.zap_scan.scan_execution import (
-    get_context_id,
-    run_scan_on_endpoint,
-)
-from security_tests.zap_scan.report import (
-    generate_html_report,
-    display_alert_summary,
-)
-from security_tests.har.zap_integration import (
-    validate_har_file,
-    import_har_into_zap,
-    wait_for_passive_scan,
-    extract_targets_from_har,
+from security_tests.zap_scan.zap_client import (
+    create_clean_session,
+    create_zap_client,
+    ensure_zap_mode,
+    test_connection,
 )
 
 
@@ -80,6 +77,10 @@ def main() -> None:
     # === PHASE 2: Context and Scope ===
     logger.info("--- PHASE 2: Context and Scope ---")
 
+    # O id devolvido aqui e usado direto na fase 6. A versao anterior o
+    # descartava e o buscava de novo pelo nome do contexto, o que criava uma
+    # dependencia fragil: renomear o contexto em um lugar quebrava a busca no
+    # outro. Nao precisar da busca e melhor do que endurece-la.
     context_id = apply_technology_allowlist(zap)
 
     # === PHASE 3: Import HAR ===
@@ -104,7 +105,6 @@ def main() -> None:
     logger.info("--- PHASE 6: Active Scan ---")
 
     targets = extract_targets_from_har(har_path)
-    context_id_str = get_context_id(zap)
 
     for i, (url, method, body, url_display) in enumerate(targets, 1):
         logger.info(f"Endpoint {i}/{len(targets)}")
@@ -114,7 +114,7 @@ def main() -> None:
             method=method,
             body=body,
             url_display=f"{method} {url_display}",
-            context_id=context_id_str,
+            context_id=context_id,
         )
 
     # === PHASE 7: Report ===

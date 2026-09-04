@@ -98,7 +98,9 @@ class TestFiltroDeEntradas:
         limpo, e as operacoes de escrita simplesmente nunca tinham sido
         escaneadas — que e onde injecao mais importa.
         """
-        assert should_keep_entry(entrada(url="http://localhost:3000/posts/1", method=method)) is True
+        assert (
+            should_keep_entry(entrada(url="http://localhost:3000/posts/1", method=method)) is True
+        )
 
     def test_regra_especifica_ainda_recusa_metodo_nao_previsto(self) -> None:
         """Vencer por especificidade nao pode virar permissao ampla."""

@@ -57,7 +57,5 @@ def apply_technology_allowlist(zap: ZAPv2) -> str:
             zap.context.include_context_technologies(context_id, tech)
             logger.debug(f"Technology included: {tech}")
 
-    logger.info(
-        f"Allowlist applied: {len(technologies)} technologies"
-    )
+    logger.info(f"Allowlist applied: {len(technologies)} technologies")
     return context_id

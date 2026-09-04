@@ -13,43 +13,9 @@ and analyzes responses to detect vulnerabilities.
 
 import time
 from typing import Any
+
 from loguru import logger
 from zapv2 import ZAPv2  # type: ignore[import-untyped]
-
-from security_tests.config import settings
-
-
-def get_context_id(zap: ZAPv2, name: str | None = None) -> str | None:
-    """
-    Looks up the context ID by name.
-
-    The ID is needed to associate the scan with the correct context, which is
-    what keeps the attack inside the intended scope.
-
-    The name defaults to the one in settings rather than being repeated here.
-    When it was duplicated, renaming the context in one module left this lookup
-    searching for a name that no longer existed.
-
-    ZAP answers a failed lookup with a plain error string instead of a mapping,
-    so the response type is checked before being read. Without that, the failure
-    surfaced as an unrelated AttributeError three call frames away from the
-    actual problem.
-    """
-    name = name or settings.ZAP_CONTEXT_NAME
-    context = zap.context.context(name)
-
-    if not isinstance(context, dict):
-        logger.warning(f"Context '{name}' not found. ZAP replied: {context!r}")
-        return None
-
-    context_id = context.get("id")
-
-    if context_id:
-        logger.debug(f"Context '{name}' found: ID {context_id}")
-    else:
-        logger.warning(f"Context '{name}' has no id: {context!r}")
-
-    return context_id
 
 
 def build_scan_kwargs(
@@ -75,9 +41,7 @@ def build_scan_kwargs(
     return kwargs
 
 
-def monitor_scan_progress(
-    zap: ZAPv2, scan_id: str, url_display: str
-) -> None:
+def monitor_scan_progress(zap: ZAPv2, scan_id: str, url_display: str) -> None:
     """
     Monitors active scan progress until 100%.
 
@@ -130,9 +94,7 @@ def run_scan_on_endpoint(
         scan_id = zap.ascan.scan(**kwargs)
 
         if scan_id is None or str(scan_id).startswith("url_not"):
-            logger.warning(
-                f"  ZAP rejected scan on {url_display}: {scan_id}"
-            )
+            logger.warning(f"  ZAP rejected scan on {url_display}: {scan_id}")
             return
 
         logger.info(f"  Scan ID: {scan_id}")

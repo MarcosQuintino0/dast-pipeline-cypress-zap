@@ -19,9 +19,9 @@ and BEFORE running the ZAP scan.
 from loguru import logger
 
 from security_tests.har.preprocessing import (
-    load_hars,
     extract_entries,
     filter_and_deduplicate_entries,
+    load_hars,
     save_har,
 )
 
@@ -35,10 +35,7 @@ def main() -> None:
     # Step 1: Load raw HARs
     hars = load_hars()
     if not hars:
-        logger.error(
-            "No HAR files found! "
-            "Run the Cypress tests first: npm run cypress:run:all"
-        )
+        logger.error("No HAR files found! Run the Cypress tests first: npm run cypress:run:all")
         return
 
     # Step 2: Extract entries
@@ -50,10 +47,7 @@ def main() -> None:
     # Step 3: Filter, deduplicate and tokenize
     filtered_entries = filter_and_deduplicate_entries(entries)
     if not filtered_entries:
-        logger.error(
-            "No entries passed the filters! "
-            "Check the ENDPOINT_RULES in config.py"
-        )
+        logger.error("No entries passed the filters! Check the ENDPOINT_RULES in config.py")
         return
 
     # Step 4: Save filtered HAR

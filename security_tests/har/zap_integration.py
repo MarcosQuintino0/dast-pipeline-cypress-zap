@@ -29,8 +29,7 @@ def validate_har_file(path: Path | None = None) -> Path:
     path = path or (settings.TRAFFIC_DIR / "filtered_traffic.har")
     if not path.exists():
         raise FileNotFoundError(
-            f"HAR not found: {path}. "
-            f"Run first: python -m security_tests.cli.process_har"
+            f"HAR not found: {path}. Run first: python -m security_tests.cli.process_har"
         )
     logger.info(f"HAR validated: {path}")
     return path
@@ -79,7 +78,7 @@ def import_har_into_zap(zap: ZAPv2, path: Path) -> None:
 
 def read_har(path: Path) -> dict[str, Any]:
     """Reads and returns the HAR JSON content."""
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -98,9 +97,7 @@ def wait_for_passive_scan(zap: ZAPv2, timeout: int | None = None) -> None:
     as active scan can interfere with passive results.
     """
     timeout = timeout or settings.ZAP_PSCAN_TIMEOUT_SECONDS
-    logger.info(
-        f"Waiting for passive scan (timeout: {timeout}s)..."
-    )
+    logger.info(f"Waiting for passive scan (timeout: {timeout}s)...")
 
     start = time.time()
     while True:
@@ -108,15 +105,12 @@ def wait_for_passive_scan(zap: ZAPv2, timeout: int | None = None) -> None:
         elapsed = time.time() - start
 
         if queue == 0:
-            logger.info(
-                f"Passive scan completed in {elapsed:.0f}s"
-            )
+            logger.info(f"Passive scan completed in {elapsed:.0f}s")
             return
 
         if elapsed > timeout:
             logger.warning(
-                f"Passive scan timeout ({timeout}s). "
-                f"{queue} records remaining in queue."
+                f"Passive scan timeout ({timeout}s). {queue} records remaining in queue."
             )
             return
 
@@ -160,7 +154,7 @@ def extract_targets_from_har(path: Path) -> list[tuple[str, str, str | None, str
             targets.append((url, method, body, clean_path))
 
     logger.info(f"Targets extracted for active scan: {len(targets)}")
-    for url, method, _, path in targets:
+    for _url, method, _, path in targets:
         logger.debug(f"  {method} {path}")
 
     return targets

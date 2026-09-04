@@ -426,12 +426,7 @@ ENDPOINT_RULES: dict[str, list[str]] = {
 If your API uses PHP + MySQL instead of Node.js:
 
 ```python
-ZAP_TECH_ALLOWLIST: str = (
-    "Language.PHP,"
-    "Db.MySQL,"
-    "WS.Apache,"
-    "OS.Linux"
-)
+ZAP_TECH_ALLOWLIST: str = "Language.PHP,Db.MySQL,WS.Apache,OS.Linux"
 ```
 
 ---

@@ -33,9 +33,7 @@ def configure_scan_policy(zap: ZAPv2) -> None:
         attackstrength=settings.ZAP_ATTACK_STRENGTH.value,
         scanpolicyname=policy,
     )
-    logger.info(
-        f"Attack Strength: {settings.ZAP_ATTACK_STRENGTH.value}"
-    )
+    logger.info(f"Attack Strength: {settings.ZAP_ATTACK_STRENGTH.value}")
 
     # Configure alert threshold
     zap.ascan.set_policy_alert_threshold(
@@ -43,9 +41,7 @@ def configure_scan_policy(zap: ZAPv2) -> None:
         alertthreshold=settings.ZAP_ALERT_THRESHOLD.value,
         scanpolicyname=policy,
     )
-    logger.info(
-        f"Alert Threshold: {settings.ZAP_ALERT_THRESHOLD.value}"
-    )
+    logger.info(f"Alert Threshold: {settings.ZAP_ALERT_THRESHOLD.value}")
 
 
 def configure_ascan_options(zap: ZAPv2) -> None:
@@ -65,6 +61,5 @@ def configure_ascan_options(zap: ZAPv2) -> None:
     zap.ascan.set_option_delay_in_ms(settings.ZAP_DELAY_IN_MS)
 
     logger.info(
-        f"Scan options: threads={settings.ZAP_THREAD_PER_HOST}, "
-        f"delay={settings.ZAP_DELAY_IN_MS}ms"
+        f"Scan options: threads={settings.ZAP_THREAD_PER_HOST}, delay={settings.ZAP_DELAY_IN_MS}ms"
     )

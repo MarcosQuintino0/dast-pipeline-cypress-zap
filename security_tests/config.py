@@ -12,7 +12,7 @@ Por que Pydantic Settings e nao um dicionario ou variaveis soltas:
 Nenhum outro arquivo do projeto deve conter valor de configuracao fixo.
 """
 
-from enum import Enum
+from enum import StrEnum
 from pathlib import Path
 from typing import Any
 from urllib.parse import urlparse
@@ -20,7 +20,7 @@ from urllib.parse import urlparse
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
-class ZapMode(str, Enum):
+class ZapMode(StrEnum):
     """Modos de operacao do ZAP.
 
     safe      observa, nunca ataca
@@ -35,7 +35,7 @@ class ZapMode(str, Enum):
     ATTACK = "attack"
 
 
-class ZapAttackStrength(str, Enum):
+class ZapAttackStrength(StrEnum):
     """Intensidade do scan ativo.
 
     LOW    poucas variacoes de payload, rapido
@@ -48,7 +48,7 @@ class ZapAttackStrength(str, Enum):
     INSANE = "INSANE"
 
 
-class ZapAlertThreshold(str, Enum):
+class ZapAlertThreshold(StrEnum):
     """Sensibilidade do alerta.
 
     LOW  reporta ate suspeita fraca, gera mais falso positivo

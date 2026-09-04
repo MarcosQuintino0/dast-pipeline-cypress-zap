@@ -14,6 +14,7 @@ This module manages ZAP connection and verification.
 
 import time
 from datetime import datetime
+
 from loguru import logger
 from zapv2 import ZAPv2  # type: ignore[import-untyped]
 
