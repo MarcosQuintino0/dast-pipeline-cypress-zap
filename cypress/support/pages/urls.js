@@ -1,15 +1,20 @@
 /**
- * Centralizes all tested endpoint URLs.
- * Using a centralized file makes maintenance easier and
- * allows swapping the API easily in the future.
+ * Centraliza as URLs de todos os endpoints exercitados.
  *
- * JSONPlaceholder provides the following resources:
- * /posts (100 posts), /comments (500 comments), /albums (100 albums),
- * /photos (5000 photos), /todos (200 todos), /users (10 users)
+ * O alvo e a API local subida por docker compose, com a mesma forma do
+ * JSONPlaceholder: /posts, /comments, /albums, /photos, /todos e /users,
+ * incluindo as rotas aninhadas /posts/:id/comments e /users/:id/posts.
+ *
+ * O valor padrao aponta para localhost de proposito.
+ *
+ * A versao anterior caia em https://jsonplaceholder.typicode.com quando a
+ * variavel nao estava definida. Num projeto que gera trafego para alimentar um
+ * scan de seguranca isso e uma armadilha: bastaria esquecer o cypress.env.json
+ * para o pipeline passar a mirar, em silencio, uma API publica de terceiros.
+ * O padrao seguro e o alvo que voce controla.
  */
 
-const baseUrl =
-  Cypress.env("apiUrl") || "https://jsonplaceholder.typicode.com";
+const baseUrl = Cypress.env("apiUrl") || "http://localhost:3000";
 
 export const urls = {
   // Posts

@@ -34,12 +34,14 @@ def apply_technology_allowlist(zap: ZAPv2) -> str:
     Returns the created context ID.
     """
     # Create context
-    context_name = "DAST_JSONPlaceholder"
+    context_name = settings.ZAP_CONTEXT_NAME
     context_id = zap.context.new_context(context_name)
     logger.info(f"Context created: {context_name} (ID: {context_id})")
 
-    # Define scope: only the JSONPlaceholder base URL
-    regex = f"{settings.BASE_URL}.*"
+    # Define scope from the URL the ZAP container itself reaches. The scope is
+    # what keeps the scan from wandering outside the target, so it has to match
+    # the address ZAP actually sees, not the one the browser used.
+    regex = f"{settings.TARGET_URL_FROM_ZAP}.*"
     zap.context.include_in_context(context_name, regex)
     logger.info(f"URL included in scope: {regex}")
 

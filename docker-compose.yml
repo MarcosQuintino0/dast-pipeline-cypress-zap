@@ -1,0 +1,60 @@
+# ---------------------------------------------------------------------------
+# Ambiente completo do pipeline DAST.
+#
+#   api   Alvo do scan. Uma API com a mesma forma do JSONPlaceholder, servida
+#         localmente por json-server a partir de um conjunto de dados fixo.
+#
+#   zap   OWASP ZAP em modo daemon, controlado pela API. E ele quem executa o
+#         scan passivo e o ativo.
+#
+# Por que o alvo roda localmente:
+#
+# Um scan ativo nao le, ele ataca. Sao centenas de payloads de injecao,
+# traversal, XSS e comando de sistema disparados contra cada endpoint. Fazer
+# isso contra um servico publico de terceiros e abuso e, em varias
+# jurisdicoes, teste de seguranca nao autorizado — mesmo que o servico seja
+# gratuito e o objetivo, didatico.
+#
+# Servindo o alvo aqui, o scan e legitimo por construcao: a infraestrutura e
+# sua. E o pipeline passa a rodar offline e a partir sempre do mesmo estado,
+# o que e condicao para comparar dois relatorios.
+# ---------------------------------------------------------------------------
+name: dast-pipeline
+
+services:
+  api:
+    build: ./target
+    container_name: dast-api
+    restart: unless-stopped
+    # Porta publicada configuravel: 3000 e disputada por muita coisa num
+    # ambiente de desenvolvimento. Ajuste API_PORT no .env se colidir.
+    ports:
+      - '${API_PORT:-3000}:3000'
+
+  zap:
+    image: zaproxy/zap-stable:2.16.1
+    container_name: dast-zap
+    restart: unless-stopped
+    # A chave de API e local e descartavel. Ela nao protege nada sensivel:
+    # existe para que a API do ZAP nao fique aberta a qualquer processo da
+    # maquina enquanto o daemon estiver de pe.
+    command: >
+      zap.sh -daemon
+      -host 0.0.0.0 -port 8080
+      -config api.key=${ZAP_API_KEY:-dast-pipeline-local}
+      -config api.addrs.addr.name=.*
+      -config api.addrs.addr.regex=true
+      -config connection.timeoutInSecs=120
+    ports:
+      - '${ZAP_PORT:-8080}:8080'
+    # O HAR gravado pelo Cypress fica no host, mas quem o importa e o ZAP, que
+    # roda aqui dentro. A API de importacao recebe um caminho de arquivo, e um
+    # caminho do host nao existe dentro do container: sem esta montagem o ZAP
+    # aceita a chamada, nao encontra nada, e o scan termina reportando zero
+    # alertas — que parece um resultado limpo e e apenas um scan que nao rodou.
+    volumes:
+      - ./security_tests/traffic:/zap/traffic:ro
+    # O ZAP nao precisa do alvo de pe para iniciar: so o alcanca durante o scan.
+    # A ordem existe para que um unico "docker compose up" deixe tudo subindo.
+    depends_on:
+      - api

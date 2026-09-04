@@ -1,16 +1,27 @@
 {
-  "name": "dast-automation-jsonplaceholder",
+  "name": "dast-pipeline-cypress-zap",
   "version": "1.0.0",
-  "description": "DAST Automation with Cypress + OWASP ZAP using JSONPlaceholder",
+  "private": true,
+  "description": "Pipeline DAST que transforma o trafego de testes Cypress em um scan de seguranca com OWASP ZAP",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
-    "cypress:open": "cypress open",
-    "cypress:run": "cypress run --browser chrome",
-    "cypress:run:posts": "cypress run --browser chrome --spec \"cypress/e2e/tests/1-posts-controller/**\"",
-    "cypress:run:comments": "cypress run --browser chrome --spec \"cypress/e2e/tests/2-comments-controller/**\"",
-    "cypress:run:todos": "cypress run --browser chrome --spec \"cypress/e2e/tests/3-todos-controller/**\"",
-    "cypress:run:users": "cypress run --browser chrome --spec \"cypress/e2e/tests/4-users-controller/**\"",
-    "cypress:run:albums": "cypress run --browser chrome --spec \"cypress/e2e/tests/5-albums-controller/**\"",
-    "cypress:run:all": "cypress run --browser chrome --spec \"cypress/e2e/tests/**/*.cy.js\""
+    "env:up": "docker compose up -d --build && node scripts/wait-for-environment.mjs",
+    "env:down": "docker compose down",
+    "env:status": "node scripts/wait-for-environment.mjs --once",
+    "target:seed": "node target/generate-db.mjs",
+    "test:e2e": "cypress run --browser chrome",
+    "test:e2e:open": "cypress open",
+    "scan:process": "python -m security_tests.cli.process_har",
+    "scan:run": "python -m security_tests.cli.run_scan",
+    "scan": "npm run test:e2e && npm run scan:process && npm run scan:run",
+    "test:unit": "pytest",
+    "lint": "ruff check .",
+    "lint:fix": "ruff check . --fix",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
   },
   "devDependencies": {
     "@neuralegion/cypress-har-generator": "^5.17.1",
