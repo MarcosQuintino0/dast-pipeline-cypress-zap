@@ -135,19 +135,35 @@ def should_keep_entry(entry: dict[str, Any]) -> bool:
     method = entry["request"]["method"]
     path = urlparse(url).path
 
-    # Check if the endpoint is in the rules
-    for rule_path, allowed_methods in settings.ENDPOINT_RULES.items():
-        if rule_path in path:
-            if method in allowed_methods:
-                return True
-            else:
-                logger.debug(
-                    f"Method {method} not allowed for {path}"
-                )
-                return False
+    # Match the MOST SPECIFIC rule, not the first one declared.
+    #
+    # The rules use substring matching, so "/posts/1" matches both "/posts" and
+    # "/posts/". Picking the first match in declaration order made the more
+    # specific rule unreachable: "/posts" (GET, POST) always won, so PUT and
+    # DELETE on "/posts/1" were dropped even though "/posts/" explicitly allows
+    # them.
+    #
+    # The failure was invisible, which is what makes it serious. The pipeline
+    # ran, the report came out clean, and the write operations — where injection
+    # matters most — had simply never been scanned. Longest match wins, so the
+    # narrower rule is the one that decides.
+    matching = [
+        (rule_path, allowed_methods)
+        for rule_path, allowed_methods in settings.ENDPOINT_RULES.items()
+        if rule_path in path
+    ]
 
-    logger.debug(f"Endpoint not in rules: {path}")
-    return False
+    if not matching:
+        logger.debug(f"Endpoint not in rules: {path}")
+        return False
+
+    rule_path, allowed_methods = max(matching, key=lambda item: len(item[0]))
+
+    if method not in allowed_methods:
+        logger.debug(f"Method {method} not allowed for {path} (rule {rule_path})")
+        return False
+
+    return True
 
 
 def generate_unique_key(entry: dict[str, Any]) -> str:
@@ -204,6 +220,33 @@ def tokenize_entry(entry: dict[str, Any]) -> dict[str, Any]:
     return entry
 
 
+def rewrite_target_host(entry: dict[str, Any]) -> dict[str, Any]:
+    """
+    Rewrites the target base URL to the address ZAP can actually reach.
+
+    The HAR is recorded by the browser, so every URL points at
+    http://localhost:3000. But the scan runs inside the ZAP container, and
+    there "localhost" is ZAP itself, not the API. Without this rewrite ZAP
+    would import the traffic, report zero reachable endpoints, and finish with
+    an empty report that looks like a clean result.
+
+    Rewriting here rather than in the Cypress layer keeps the browser traffic
+    faithful to what a real client sees, and confines the container-networking
+    detail to the one place that already reshapes the HAR.
+    """
+    de = settings.TARGET_URL
+    para = settings.TARGET_URL_FROM_ZAP
+
+    if de == para:
+        return entry
+
+    url = entry.get("request", {}).get("url", "")
+    if url.startswith(de):
+        entry["request"]["url"] = para + url[len(de) :]
+
+    return entry
+
+
 def filter_and_deduplicate_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """
     Complete filtering and deduplication pipeline.
@@ -212,6 +255,7 @@ def filter_and_deduplicate_entries(entries: list[dict[str, Any]]) -> list[dict[s
     2. Filters by business rules (status, endpoint, method)
     3. Deduplicates by METHOD|URL key
     4. Tokenizes sensitive fields
+    5. Rewrites the host to the address reachable from the ZAP container
 
     Returns a list of clean entries ready for ZAP.
     """
@@ -236,6 +280,10 @@ def filter_and_deduplicate_entries(entries: list[dict[str, Any]]) -> list[dict[s
 
         # Step 4: Tokenize
         entry = tokenize_entry(entry)
+
+        # Step 5: Point the URL at the address ZAP reaches
+        entry = rewrite_target_host(entry)
+
         result.append(entry)
 
     logger.info(
