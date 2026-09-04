@@ -36,17 +36,45 @@ def validate_har_file(path: Path | None = None) -> Path:
     return path
 
 
+def path_inside_zap_container(path: Path) -> str:
+    """
+    Translates a host path into the path ZAP sees inside its container.
+
+    The import API takes a file path and opens it on the filesystem of whoever
+    runs ZAP. The HAR is written by Cypress on the host, and ZAP runs in a
+    container, so the path has to be translated.
+
+    Without the translation ZAP accepts the call, finds nothing, and every
+    later scan is rejected with url_not_found — which surfaces as a report with
+    zero alerts. A scan that never ran and a target with no findings look
+    identical in the output, and only one of them is good news.
+
+    The mount that makes both sides agree is declared in docker-compose.yml.
+    """
+    return f"{settings.ZAP_TRAFFIC_DIR_IN_CONTAINER}/{path.name}"
+
+
 def import_har_into_zap(zap: ZAPv2, path: Path) -> None:
     """
     Imports the HAR file into ZAP via API.
 
-    ZAP reads the HAR and indexes all requests internally.
-    This populates ZAP's Site Tree and automatically triggers
-    the passive scan on each imported request.
+    ZAP reads the HAR and indexes all requests internally. This populates the
+    Site Tree and triggers the passive scan on each imported request. The Site
+    Tree is also what the active scan checks against, so an endpoint missing
+    here can never be attacked.
     """
-    logger.info(f"Importing HAR into ZAP: {path}")
-    result = zap.exim.import_har(str(path))
+    caminho_no_container = path_inside_zap_container(path)
+    logger.info(f"Importing HAR into ZAP: {caminho_no_container} (host: {path})")
+
+    result = zap.exim.import_har(caminho_no_container)
     logger.info(f"Import result: {result}")
+
+    if isinstance(result, str) and result.strip().upper() not in {"OK", ""}:
+        raise RuntimeError(
+            f"ZAP could not import the HAR: {result!r}\n"
+            f"Expected the file at {caminho_no_container} inside the container. "
+            "Check the traffic volume in docker-compose.yml."
+        )
 
 
 def read_har(path: Path) -> dict[str, Any]:

@@ -19,19 +19,36 @@ from zapv2 import ZAPv2  # type: ignore[import-untyped]
 from security_tests.config import settings
 
 
-def get_context_id(zap: ZAPv2, name: str = "DAST_JSONPlaceholder") -> str | None:
+def get_context_id(zap: ZAPv2, name: str | None = None) -> str | None:
     """
     Looks up the context ID by name.
 
-    The ID is needed to associate the scan with the correct context,
-    ensuring only URLs in scope are attacked.
+    The ID is needed to associate the scan with the correct context, which is
+    what keeps the attack inside the intended scope.
+
+    The name defaults to the one in settings rather than being repeated here.
+    When it was duplicated, renaming the context in one module left this lookup
+    searching for a name that no longer existed.
+
+    ZAP answers a failed lookup with a plain error string instead of a mapping,
+    so the response type is checked before being read. Without that, the failure
+    surfaced as an unrelated AttributeError three call frames away from the
+    actual problem.
     """
-    contexts = zap.context.context(name)
-    context_id = contexts.get("id", None)
+    name = name or settings.ZAP_CONTEXT_NAME
+    context = zap.context.context(name)
+
+    if not isinstance(context, dict):
+        logger.warning(f"Context '{name}' not found. ZAP replied: {context!r}")
+        return None
+
+    context_id = context.get("id")
+
     if context_id:
         logger.debug(f"Context '{name}' found: ID {context_id}")
     else:
-        logger.warning(f"Context '{name}' not found!")
+        logger.warning(f"Context '{name}' has no id: {context!r}")
+
     return context_id
 
 
