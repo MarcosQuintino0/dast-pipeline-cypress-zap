@@ -1,0 +1,28 @@
+[project]
+name = "dast-pipeline-cypress-zap"
+version = "1.0.0"
+description = "Pipeline DAST que transforma o trafego de testes Cypress em um scan de seguranca com OWASP ZAP"
+requires-python = ">=3.11"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-q --strict-markers"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+exclude = [".venv", "node_modules", "security_tests/traffic", "security_tests/reports"]
+
+[tool.ruff.lint]
+# E,F  erros e pyflakes          I    ordenacao de imports
+# B    bugbear, armadilhas reais UP   sintaxe moderna
+# SIM  simplificacoes            RUF  regras do proprio ruff
+select = ["E", "F", "I", "B", "UP", "SIM", "RUF"]
+
+[tool.ruff.lint.per-file-ignores]
+# Testes repetem literais e usam asserts longos sem prejuizo de leitura.
+"tests/*" = ["E501"]
+
+[tool.ruff.format]
+quote-style = "double"
