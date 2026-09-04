@@ -1,0 +1,33 @@
+# Dependencias
+node_modules/
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+
+# Configuracao local, nunca versionada
+.env
+cypress.env.json
+
+# Artefatos de execucao
+cypress/screenshots/
+cypress/videos/
+cypress/downloads/
+security_tests/traffic/*.har
+security_tests/reports/*.html
+security_tests/reports/*.json
+
+# Evidencias temporarias
+docs/assets/.tmp/
+*.webm
+
+# Ferramentas e IDE
+.pytest_cache/
+.ruff_cache/
+.vscode/
+.idea/
+.claude/
+*.log
+
+.DS_Store
+Thumbs.db

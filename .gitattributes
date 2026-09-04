@@ -1,0 +1,6 @@
+# Normaliza quebras de linha, evitando diffs ruidosos entre Windows e o CI.
+* text=auto eol=lf
+
+*.png binary
+*.gif binary
+*.har binary

@@ -1,0 +1,20 @@
+{
+  "name": "dast-automation-jsonplaceholder",
+  "version": "1.0.0",
+  "description": "DAST Automation with Cypress + OWASP ZAP using JSONPlaceholder",
+  "scripts": {
+    "cypress:open": "cypress open",
+    "cypress:run": "cypress run --browser chrome",
+    "cypress:run:posts": "cypress run --browser chrome --spec \"cypress/e2e/tests/1-posts-controller/**\"",
+    "cypress:run:comments": "cypress run --browser chrome --spec \"cypress/e2e/tests/2-comments-controller/**\"",
+    "cypress:run:todos": "cypress run --browser chrome --spec \"cypress/e2e/tests/3-todos-controller/**\"",
+    "cypress:run:users": "cypress run --browser chrome --spec \"cypress/e2e/tests/4-users-controller/**\"",
+    "cypress:run:albums": "cypress run --browser chrome --spec \"cypress/e2e/tests/5-albums-controller/**\"",
+    "cypress:run:all": "cypress run --browser chrome --spec \"cypress/e2e/tests/**/*.cy.js\""
+  },
+  "devDependencies": {
+    "@neuralegion/cypress-har-generator": "^5.17.1",
+    "cypress": "^13.0.0",
+    "prettier": "^3.0.0"
+  }
+}
