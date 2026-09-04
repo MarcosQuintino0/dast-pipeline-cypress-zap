@@ -34,6 +34,11 @@ scanner ataca.
 Um scan completo leva cerca de **10 minutos** e roda inteiro na sua máquina,
 contra um alvo que sobe junto do projeto.
 
+Os números acima são de uma execução local. Entre execuções, os **tipos** de
+alerta se mantêm; a contagem de instâncias oscila um pouco — a mesma pipeline no
+GitHub Actions fechou em 237. Por isso a triagem trabalha sobre os tipos, e não
+sobre o total.
+
 ---
 
 ## O problema
