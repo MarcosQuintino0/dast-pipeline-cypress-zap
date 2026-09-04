@@ -135,7 +135,10 @@ exige engenheiro é separar risco real de ruído — e provar a diferença. Roda
 ferramenta é o passo fácil.
 
 **Segurança como etapa do pipeline, não como evento.** O scan roda no mesmo CI
-que os testes funcionais, com o mesmo gatilho e o mesmo critério de falha.
+que os testes funcionais, no mesmo push, e publica relatório e HAR filtrado como
+artefato. O que deliberadamente **não** fica automático é o julgamento: o
+pipeline não decide sozinho se um alerta alto é risco ou ruído — as duas
+triagens acima mostram por quê.
 
 **Tratar o tráfego antes de atacar.** O HAR bruto registra o que o navegador
 fez, não o que interessa atacar: nesta execução, cinco chamadas internas do
