@@ -1,0 +1,8 @@
+Este diretorio precisa existir antes de `docker compose up`.
+
+O compose o monta como volume no container do ZAP. Se o diretorio nao existir,
+o Docker o cria como root, e o processo que roda os testes — sem privilegio —
+falha com EACCES ao gravar o HAR. Foi exatamente o que aconteceu na primeira
+execucao do pipeline no GitHub Actions.
+
+Os arquivos .har em si nao sao versionados (ver .gitignore).
