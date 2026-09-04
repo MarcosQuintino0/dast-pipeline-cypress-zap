@@ -26,8 +26,8 @@ scanner ataca.
 | **17 endpoints** entregues ao scanner         | GET, POST, PUT e DELETE                 |
 | **235 alertas** encontrados pelo ZAP          | 2 de severidade alta                    |
 | **2 achados altos triados com prova**         | 1 falso positivo, 1 real                |
-| **41 testes unitários** no código do pipeline | cobrem o filtro que decide o que atacar |
-| **4 defeitos corrigidos** no projeto de base  | 3 deles silenciosos                     |
+| **44 testes unitários** no código do pipeline | cobrem o filtro que decide o que atacar |
+| **6 defeitos corrigidos** no projeto de base  | 5 deles silenciosos                     |
 
 Um scan completo leva cerca de **10 minutos** e roda inteiro na sua máquina,
 contra um alvo que sobe junto do projeto.
@@ -136,7 +136,7 @@ tempo de scan e gera falso positivo sobre recurso estático. O pré-processament
 valida, filtra por status e por método, deduplica por rota e tokeniza
 identificadores: **24 requisições brutas viram 17 alvos limpos**.
 
-**Testar a ferramenta de teste.** O módulo que decide o que será atacado tem 41
+**Testar a ferramenta de teste.** O módulo que decide o que será atacado tem 44
 testes. Um erro ali não aparece como falha — aparece como relatório limpo,
 porque o tráfego certo nunca chegou ao scanner.
 
@@ -263,18 +263,22 @@ ser traduzido — e o volume que faz a ponte está declarado no compose.
 ## O que foi corrigido em relação ao projeto de base
 
 Este repositório parte de um projeto anterior de automação DAST. Colocá-lo para
-rodar de ponta a ponta revelou quatro defeitos, três deles silenciosos:
+rodar de ponta a ponta — na máquina e no CI — revelou seis defeitos, cinco deles
+silenciosos:
 
-| Defeito                                        | Consequência                                                   |
-| ---------------------------------------------- | -------------------------------------------------------------- |
-| Regra de endpoint genérica vencia a específica | `PUT` e `DELETE` **nunca eram escaneados**                     |
-| Caminho de arquivo cruzando host e container   | Scan terminava com `exit 0` e **zero alertas**, sem ter rodado |
-| Nome de contexto duplicado em dois módulos     | Scan quebrava na fase 6, após cinco fases bem-sucedidas        |
-| Alvo padrão apontando para API pública         | Scan ativo contra infraestrutura de terceiros                  |
+| Defeito                                               | Consequência                                                   |
+| ----------------------------------------------------- | -------------------------------------------------------------- |
+| Regra de endpoint genérica vencia a específica        | `PUT` e `DELETE` **nunca eram escaneados**                     |
+| Caminho de arquivo cruzando host e container          | Scan terminava com `exit 0` e **zero alertas**, sem ter rodado |
+| Nome de contexto duplicado em dois módulos            | Scan quebrava na fase 6, após cinco fases bem-sucedidas        |
+| Alvo padrão apontando para API pública                | Scan ativo contra infraestrutura de terceiros                  |
+| Processamento do HAR encerrava com `exit 0` ao falhar | Passo verde no CI sobre um arquivo que nunca foi escrito       |
+| Diretório do volume ausente no repositório            | Docker o criava como root e a gravação do HAR falhava no CI    |
 
-O segundo é o mais perigoso: **um scan que não rodou e um alvo sem
-vulnerabilidades produzem exatamente a mesma saída.** Só um dos dois é boa
-notícia. Hoje a importação falha de forma explícita se o ZAP não a aceitar.
+O padrão se repete, e é o que torna o conjunto interessante: **um scan que não
+rodou e um alvo sem vulnerabilidades produzem exatamente a mesma saída.** Só um
+dos dois é boa notícia. Hoje cada etapa falha alto — importação recusada pelo
+ZAP e processamento sem tráfego encerram o pipeline em vez de deixá-lo verde.
 
 ---
 
