@@ -49,9 +49,10 @@ sessão autenticada, não conhece o payload válido, não sabe a ordem das chama
 
 ## A solução
 
-Os testes funcionais já sabem tudo isso. Eles autenticam, montam payloads
-válidos e percorrem os fluxos na ordem certa. O tráfego que produzem é, por
-construção, um mapa atualizado da API.
+Os testes funcionais já sabem tudo isso. Montam payloads válidos, percorrem os
+fluxos na ordem certa e — quando a aplicação exige — carregam a sessão
+autenticada. O tráfego que produzem é, por construção, um mapa atualizado da
+API.
 
 Este projeto captura esse tráfego e o transforma em entrada para o scanner.
 
@@ -69,6 +70,10 @@ O detalhe que faz o mecanismo funcionar: os testes usam **`fetch()` do
 navegador**, e não `cy.request()`. O `cy.request()` sai do processo Node do
 Cypress e nunca passa pelo navegador, então não aparece no HAR — o pipeline
 inteiro ficaria sem tráfego para analisar.
+
+_Uma ressalva:_ o alvo deste repositório não exige autenticação, então a parte
+do mecanismo que carrega a sessão não é exercida aqui. O caminho existe — é o
+HAR que a transporta —, mas não há prova de execução dele neste projeto.
 
 ---
 
@@ -132,13 +137,15 @@ ferramenta é o passo fácil.
 **Segurança como etapa do pipeline, não como evento.** O scan roda no mesmo CI
 que os testes funcionais, com o mesmo gatilho e o mesmo critério de falha.
 
-**Tratar o tráfego antes de atacar.** O HAR bruto tem CSS, favicon, chamadas
-internas do Cypress e dezenas de repetições. Entregar isso ao ZAP desperdiça
-tempo de scan e gera falso positivo sobre recurso estático. O pré-processamento
-valida, filtra por status e por método, deduplica por rota e tokeniza
-identificadores: **24 requisições brutas viram 17 alvos limpos**.
+**Tratar o tráfego antes de atacar.** O HAR bruto registra o que o navegador
+fez, não o que interessa atacar: nesta execução, cinco chamadas internas do
+Cypress e duas repetições da mesma rota. Numa aplicação com interface entram
+também CSS, imagens e favicon. Entregar isso ao ZAP desperdiça tempo de scan e
+gera falso positivo sobre recurso estático. O pré-processamento valida, filtra
+por status e por método, deduplica por rota e tokeniza identificadores:
+**24 requisições brutas viram 17 alvos limpos**.
 
-**Testar a ferramenta de teste.** O módulo que decide o que será atacado tem 44
+**Testar a ferramenta de teste.** A lógica que decide o que será atacado tem 44
 testes. Um erro ali não aparece como falha — aparece como relatório limpo,
 porque o tráfego certo nunca chegou ao scanner.
 
@@ -237,7 +244,8 @@ security_tests/
   config.py        toda a configuração, validada por Pydantic
 
 target/            a API alvo e o gerador do conjunto de dados
-tests/             41 testes do código Python
+tests/             44 testes do código Python
+scripts/           espera do ambiente e geração das evidências
 docs/              triagem dos achados e evidências
 ```
 
