@@ -1,450 +1,285 @@
-# DAST Automation - Cypress + OWASP ZAP
+# DAST Pipeline — Cypress + OWASP ZAP
 
-Automated **DAST** (Dynamic Application Security Testing) template that combines **Cypress** for HTTP traffic generation and **OWASP ZAP** for vulnerability scanning.
+### Os testes que você já escreveu podem virar um scan de segurança
 
----
+Este pipeline captura o tráfego HTTP que os testes **Cypress** produzem, trata
+esse tráfego e o entrega ao **OWASP ZAP** como mapa de ataque. Nenhum endpoint
+precisa ser catalogado à mão: o que os testes exercitam é exatamente o que o
+scanner ataca.
 
-## About the Project
+[![Pipeline](https://github.com/MarcosQuintino0/dast-pipeline-cypress-zap/actions/workflows/pipeline.yml/badge.svg)](https://github.com/MarcosQuintino0/dast-pipeline-cypress-zap/actions/workflows/pipeline.yml)
+[![Cypress](https://img.shields.io/badge/Cypress-E2E-17202C?logo=cypress&logoColor=white)](https://cypress.io)
+[![OWASP ZAP](https://img.shields.io/badge/OWASP_ZAP-DAST-00549E?logo=owasp&logoColor=white)](https://www.zaproxy.org)
+[![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)](https://python.org)
+[![Docker](https://img.shields.io/badge/Docker-Compose-2496ED?logo=docker&logoColor=white)](https://docs.docker.com/compose/)
+[![Licença MIT](https://img.shields.io/badge/licença-MIT-blue)](LICENSE)
 
-### Goal
-
-This project demonstrates a complete approach to **automated security testing** for REST APIs. The pipeline works in 3 stages:
-
-1. **Cypress** runs E2E tests that make real API requests, recording all HTTP traffic in **HAR** (HTTP Archive) files
-2. **Python scripts** process the HARs: filter noise, deduplicate endpoints, and tokenize sensitive fields
-3. **OWASP ZAP** imports the processed traffic, runs passive and active scans, and generates an HTML report with the vulnerabilities found
-
-```
-Cypress E2E Tests
-       |
-       v
-  HAR Files (raw traffic)
-       |
-       v
-  Python (filter, deduplicate, tokenize)
-       |
-       v
-  filtered_traffic.har
-       |
-       v
-  OWASP ZAP imports HAR
-       |
-       v
-  Passive Scan (headers, cookies, info leaks)
-       |
-       v
-  Active Scan (SQL Injection, XSS, etc.)
-       |
-       v
-  HTML Vulnerability Report
-```
-
-### This is a Template, Not a Recipe
-
-> **IMPORTANT:** This project serves as a **starting point** and reference. Don't follow the structure blindly - adapt it to your application's reality.
-
-Every API has its own specifics: authentication, rate limiting, endpoint dependencies, business rules, etc. Use this template as a base and modify as needed.
-
-**Examples of what you can (and should) adapt:**
-
-- **Authentication**: add a login/token flow in Cypress's `before()` (OAuth, JWT, API Key, etc.)
-- **Data cleanup**: include database reset/cleanup steps between runs to avoid data pollution
-- **Endpoint rules**: configure which endpoints and HTTP methods are relevant for your context
-- **Dynamic fixtures**: generate test payloads that respect your API's validation rules
-- **Pre/post scan hooks**: run scripts before or after the scan (e.g., create test user, clear sessions)
-- **CI/CD integration**: adapt the scripts to run in pipelines (GitHub Actions, GitLab CI, Jenkins, etc.)
-- **Quality thresholds**: define acceptance criteria (e.g., fail the pipeline if High vulnerabilities are found)
-
-### Why JSONPlaceholder?
-
-This example uses **JSONPlaceholder** (https://jsonplaceholder.typicode.com) as the target API because it is:
-
-- **Public and free** - no registration, authentication, or API key required
-- **No rate limiting** - allows multiple requests without blocking
-- **Standard REST** - supports GET, POST, PUT, DELETE
-- **Stable** - available 24/7, ideal for demonstrations
-- **Safe for testing** - write operations (POST, PUT, DELETE) are simulated and don't persist real data
-
-In a real scenario, you would replace the base URL and endpoints with your own API.
+![As quatro etapas do pipeline com a saída real de cada uma: ambiente pronto, Cypress gerando tráfego, processamento do HAR e scan do OWASP ZAP encontrando 235 alertas](docs/assets/pipeline.gif)
 
 ---
 
-## Prerequisites
+## Resultados
 
-| Tool | Version | Description |
-|---|---|---|
-| **Node.js** | 18+ | Runtime for Cypress |
-| **Python** | 3.10+ | Core automation (HAR processing + ZAP integration) |
-| **OWASP ZAP** | 2.14+ | DAST security scanner |
-| **Google Chrome** | Any | Browser for Cypress tests (required for HAR capture) |
+|                                               |                                         |
+| --------------------------------------------- | --------------------------------------- |
+| **19 testes Cypress** geram o tráfego         | 7 segundos                              |
+| **17 endpoints** entregues ao scanner         | GET, POST, PUT e DELETE                 |
+| **235 alertas** encontrados pelo ZAP          | 2 de severidade alta                    |
+| **2 achados altos triados com prova**         | 1 falso positivo, 1 real                |
+| **41 testes unitários** no código do pipeline | cobrem o filtro que decide o que atacar |
+| **4 defeitos corrigidos** no projeto de base  | 3 deles silenciosos                     |
+
+Um scan completo leva cerca de **10 minutos** e roda inteiro na sua máquina,
+contra um alvo que sobe junto do projeto.
 
 ---
 
-## Installation
+## O problema
 
-### 1. Clone the repository
+A maioria dos projetos trata qualidade funcional e segurança como trilhos
+separados. Os testes E2E rodam no pipeline; o teste de segurança acontece uma
+vez por trimestre, com alguém apontando um scanner para a aplicação e
+catalogando endpoints na mão.
 
-```bash
-git clone <repo-url>
-cd cypress-owasp
+Isso tem dois custos. O catálogo de endpoints **envelhece** — some um, nasce
+outro, ninguém atualiza. E o scanner **não sabe usar a aplicação**: não tem
+sessão autenticada, não conhece o payload válido, não sabe a ordem das chamadas.
+
+## A solução
+
+Os testes funcionais já sabem tudo isso. Eles autenticam, montam payloads
+válidos e percorrem os fluxos na ordem certa. O tráfego que produzem é, por
+construção, um mapa atualizado da API.
+
+Este projeto captura esse tráfego e o transforma em entrada para o scanner.
+
+```mermaid
+flowchart LR
+    C["Cypress<br/>19 testes"] -->|"fetch() do navegador"| A["API alvo<br/>local, em Docker"]
+    C -.->|grava| H["HAR<br/>tráfego bruto"]
+    H --> P["Pré-processamento<br/>Python"]
+    P -->|"17 endpoints<br/>filtrados"| Z["OWASP ZAP<br/>passivo + ativo"]
+    Z -->|ataca| A
+    Z --> R["Relatório<br/>HTML + triagem"]
 ```
 
-### 2. Install Node.js dependencies (Cypress)
+O detalhe que faz o mecanismo funcionar: os testes usam **`fetch()` do
+navegador**, e não `cy.request()`. O `cy.request()` sai do processo Node do
+Cypress e nunca passa pelo navegador, então não aparece no HAR — o pipeline
+inteiro ficaria sem tráfego para analisar.
 
-```bash
-npm install
+---
+
+## O achado principal
+
+O scan encontrou **2 alertas de severidade alta**. Um é falso positivo, o outro
+é real, e **ambos foram verificados fora da ferramenta**.
+
+![Relatório do OWASP ZAP mostrando 2 alertas de risco alto, 2 baixos e 1 informativo, somando 235 instâncias](docs/assets/relatorio-zap.png)
+
+### SQL Injection — falso positivo
+
+O ZAP acusou injeção de SQL no cabeçalho `Accept`, com o campo de evidência
+**vazio**. Três coisas não fechavam: um cabeçalho de negociação de conteúdo não
+costuma alimentar consulta a banco, evidência vazia indica detecção por
+heurística, e o alvo persiste num arquivo JSON — **não tem banco SQL algum**.
+
+Reproduzindo o payload e comparando as respostas por hash:
+
+```
+AND '1'='1'  →  c6f914455134791aead74569b7636d36
+AND '1'='2'  →  c6f914455134791aead74569b7636d36
+sem payload  →  c6f914455134791aead74569b7636d36
 ```
 
-### 3. Install Python dependencies
+Idênticas. A detecção de injeção cega booleana compara a resposta de `'1'='1'`
+com a de `'1'='2'`; quando a aplicação **ignora** o parâmetro, as duas ficam
+iguais — e é essa igualdade que a heurística lê como condição sempre verdadeira.
 
-With virtual environment (recommended):
+### External Redirect — real
+
+O cabeçalho `Host` é refletido, sem validação, nas URLs de paginação:
 
 ```bash
-python -m venv venv
+curl -H "Host: atacante.example" "http://localhost:3000/comments?_page=1"
+```
 
-# Windows
-venv\Scripts\activate
+```
+Link: <http://atacante.example/comments?_page=2>; rel="next"
+```
 
-# Linux/Mac
-source venv/bin/activate
+Um cliente que siga a paginação — comportamento correto segundo a RFC 8288 — é
+conduzido a um host escolhido por quem fez a requisição. É a base do
+envenenamento de cache web e do envenenamento de link de recuperação de senha.
 
+**Ressalva:** nesta instância o risco concreto é baixo, porque não há cache
+intermediário nem envio de e-mail. O que o achado demonstra é a classe do
+defeito e a capacidade do pipeline de encontrá-la.
+
+**A triagem completa, com os passos de reprodução, está em
+[`docs/triagem-dos-achados.md`](docs/triagem-dos-achados.md).**
+
+---
+
+## O que este projeto demonstra
+
+**Um scanner não entrega vulnerabilidades, entrega candidatos.** A parte que
+exige engenheiro é separar risco real de ruído — e provar a diferença. Rodar a
+ferramenta é o passo fácil.
+
+**Segurança como etapa do pipeline, não como evento.** O scan roda no mesmo CI
+que os testes funcionais, com o mesmo gatilho e o mesmo critério de falha.
+
+**Tratar o tráfego antes de atacar.** O HAR bruto tem CSS, favicon, chamadas
+internas do Cypress e dezenas de repetições. Entregar isso ao ZAP desperdiça
+tempo de scan e gera falso positivo sobre recurso estático. O pré-processamento
+valida, filtra por status e por método, deduplica por rota e tokeniza
+identificadores: **24 requisições brutas viram 17 alvos limpos**.
+
+**Testar a ferramenta de teste.** O módulo que decide o que será atacado tem 41
+testes. Um erro ali não aparece como falha — aparece como relatório limpo,
+porque o tráfego certo nunca chegou ao scanner.
+
+---
+
+## Segurança do próprio pipeline
+
+Um scan ativo não lê: **ataca**. São centenas de payloads de injeção, traversal,
+XSS e comando de sistema disparados contra cada endpoint. Apontar isso para
+infraestrutura de terceiros é abuso e, em várias jurisdições, teste não
+autorizado.
+
+Daí três decisões:
+
+**O alvo sobe com o projeto.** O `docker compose` levanta uma API local com a
+forma do JSONPlaceholder. Você é o dono, o scan é legítimo por construção, e o
+pipeline roda offline.
+
+**Uma allowlist bloqueia o resto.** Antes de qualquer coisa tocar a rede, a fase
+0 recusa alvo fora da lista:
+
+```python
+assert_target_is_allowed(settings.TARGET_URL)
+```
+
+**O padrão é seguro.** Nenhum caminho de configuração leva a um host externo por
+omissão — esquecer uma variável não redireciona o ataque para fora.
+
+---
+
+## Stack
+
+|                        |                                        |
+| ---------------------- | -------------------------------------- |
+| **Testes funcionais**  | Cypress 13, JavaScript                 |
+| **Captura de tráfego** | `@neuralegion/cypress-har-generator`   |
+| **Pipeline de dados**  | Python 3.11, Pydantic Settings, Loguru |
+| **Scanner**            | OWASP ZAP 2.16 em modo daemon, via API |
+| **Alvo**               | json-server, com dados determinísticos |
+| **Ambiente**           | Docker Compose                         |
+| **Qualidade**          | pytest, ruff, Prettier                 |
+| **CI/CD**              | GitHub Actions                         |
+
+---
+
+## Como executar
+
+Precisa de **Node 20+**, **Python 3.11+**, **Docker** e **Chrome**.
+
+```bash
+git clone https://github.com/MarcosQuintino0/dast-pipeline-cypress-zap.git
+cd dast-pipeline-cypress-zap
+
+npm ci
+python -m venv .venv
+source .venv/bin/activate          # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
+
+cp .env.example .env
+cp cypress.env.example.json cypress.env.json
+
+npm run env:up                     # sobe a API alvo e o OWASP ZAP
+npm run scan                       # Cypress → processamento → scan → relatório
 ```
 
-Or directly (without venv):
+O relatório sai em `security_tests/reports/`.
 
-```bash
-pip install -r requirements.txt
-```
+### Comandos
 
-### 4. Configure OWASP ZAP
-
-1. Download and install OWASP ZAP: https://www.zaproxy.org/download/
-2. Open ZAP
-3. Go to **Tools > Options > API**
-4. Copy the **API Key** shown on screen
-5. Create a `.env` file in the project root:
-
-```env
-ZAP_API_KEY=paste_your_api_key_here
-```
-
-> The `.env` is already in `.gitignore` to avoid exposing your key in the repository.
+| Comando                | O que faz                                 |
+| ---------------------- | ----------------------------------------- |
+| `npm run env:up`       | Sobe alvo e ZAP, e espera ficarem prontos |
+| `npm run env:status`   | Diagnóstico do ambiente                   |
+| `npm run env:down`     | Derruba tudo                              |
+| `npm run test:e2e`     | Só os testes Cypress                      |
+| `npm run scan:process` | Só o processamento do HAR                 |
+| `npm run scan:run`     | Só o scan do ZAP                          |
+| `npm run scan`         | O pipeline completo                       |
+| `npm run test:unit`    | Testes do código Python                   |
+| `npm run lint`         | ruff                                      |
 
 ---
 
-## Usage
-
-The pipeline has 3 steps that must be executed in order:
-
-### Step 1: Run Cypress tests (generate HAR traffic)
-
-```bash
-# Run ALL tests at once
-npm run cypress:run:all
-
-# Or run by controller individually
-npm run cypress:run:posts
-npm run cypress:run:comments
-npm run cypress:run:todos
-npm run cypress:run:users
-npm run cypress:run:albums
-```
-
-After execution, HAR files will be generated in `security_tests/traffic/`.
-
-> **Tip:** To open the Cypress GUI and debug tests: `npm run cypress:open`
-
-### Step 2: Process the HAR files
-
-```bash
-python -m security_tests.cli.process_har
-```
-
-This command runs the preprocessing pipeline:
-
-1. **Loads** all raw HARs from the `traffic/` folder
-2. **Filters** error responses (4xx, 5xx) and out-of-scope endpoints
-3. **Deduplicates** by `METHOD|URL` combination (no need to scan the same endpoint 10x)
-4. **Tokenizes** numeric fields with `{{AUTO_INT}}` so ZAP generates unique values
-5. **Saves** the result as `filtered_traffic.har`
-
-### Step 3: Run the security scan
-
-> **IMPORTANT:** OWASP ZAP must be running before executing this command.
-
-```bash
-python -m security_tests.cli.run_scan
-```
-
-The scan runs through 7 phases:
-
-| Phase | Description |
-|---|---|
-| 1. Connection | Connects to ZAP and creates a clean session |
-| 2. Context | Configures scope and technology allowlist |
-| 3. Import HAR | Imports filtered traffic into ZAP |
-| 4. Passive Scan | Analyzes headers, cookies, info leaks (no traffic sent) |
-| 5. Configure Active | Sets attack policy (strength, threshold, threads) |
-| 6. Active Scan | Sends malicious payloads endpoint by endpoint |
-| 7. Report | Generates HTML with all vulnerabilities found |
-
-The HTML report will be saved in `security_tests/reports/`.
-
----
-
-## Project Structure
+## Estrutura
 
 ```
-cypress-owasp/
-|
-|-- cypress/
-|   |-- e2e/tests/                       # E2E tests organized by controller
-|   |   |-- 1-posts-controller/          #   GET, POST, PUT, DELETE on /posts
-|   |   |-- 2-comments-controller/       #   GET, POST on /comments
-|   |   |-- 3-todos-controller/          #   GET, POST on /todos
-|   |   |-- 4-users-controller/          #   GET on /users
-|   |   |-- 5-albums-controller/         #   GET on /albums and /photos
-|   |
-|   |-- fixtures/                        # Static test data
-|   |-- support/
-|       |-- commands.js                  # Custom commands (apiFetch, etc.)
-|       |-- e2e.js                       # Global setup (before/after with HAR)
-|       |-- pages/
-|           |-- urls.js                  # Centralized endpoint URLs
-|           |-- payloads.js              # Centralized payloads for POST/PUT
-|
-|-- security_tests/
-|   |-- config.py                        # Centralized configuration (Pydantic Settings)
-|   |
-|   |-- cli/                             # Command-line scripts
-|   |   |-- process_har.py               #   Preprocessing pipeline
-|   |   |-- run_scan.py                  #   ZAP scan pipeline
-|   |
-|   |-- har/                             # HAR processing modules
-|   |   |-- preprocessing.py             #   Filter, deduplicate, tokenize
-|   |   |-- zap_integration.py           #   Import HAR into ZAP, extract targets
-|   |
-|   |-- zap_scan/                        # ZAP scan modules
-|   |   |-- zap_client.py                #   Connection and session
-|   |   |-- context.py                   #   Scope and technologies
-|   |   |-- scan_policy.py               #   Attack strength and thresholds
-|   |   |-- scan_execution.py            #   Active scan per endpoint
-|   |   |-- script_randomizer.py         #   HttpSender script for tokens
-|   |   |-- report.py                    #   Generate HTML report
-|   |
-|   |-- zap_scripts/
-|   |   |-- replace_tokens.js            # JS script executed by ZAP
-|   |
-|   |-- traffic/                         # HAR files (generated, gitignored)
-|   |-- reports/                         # HTML reports (generated, gitignored)
-|
-|-- cypress.config.js                    # Cypress + HAR generator configuration
-|-- cypress.env.json                     # Cypress environment variables
-|-- package.json                         # Node.js dependencies
-|-- requirements.txt                     # Python dependencies
-|-- pyrightconfig.json                   # Python type checker configuration
-|-- .env                                 # ZAP API key (gitignored)
-|-- .gitignore
+cypress/
+  e2e/tests/       5 specs, 19 testes que geram o tráfego
+  support/         comandos, URLs e payloads centralizados
+
+security_tests/
+  cli/             os dois pontos de entrada do pipeline
+  har/             filtra, deduplica, tokeniza e reescreve o HAR
+  zap_scan/        contexto, política, execução e relatório do ZAP
+  zap_scripts/     script HttpSender executado dentro do ZAP
+  config.py        toda a configuração, validada por Pydantic
+
+target/            a API alvo e o gerador do conjunto de dados
+tests/             41 testes do código Python
+docs/              triagem dos achados e evidências
 ```
 
 ---
 
-## How It Works (Technical Details)
+## Três detalhes que resolvem problemas reais
 
-### Why `fetch()` and not `cy.request()`?
+**Tokenização de identificadores.** Durante o scan, o ZAP dispara centenas de
+requisições contra o mesmo endpoint. Se todas usarem `userId: 1`, disputam o
+mesmo registro e produzem conflito em vez de resultado. O pré-processamento
+troca esses valores por `{{AUTO_INT}}`, e um script HttpSender rodando **dentro
+do ZAP** substitui o token por um número novo a cada requisição.
 
-Cypress has the `cy.request()` command for making HTTP requests, but it executes the request in Cypress's **Node.js** process, **outside the browser**. This means the HAR generator (which intercepts browser traffic) **does not capture these requests**.
+**Allowlist de tecnologias.** O ZAP traz centenas de regras. Declarar que o alvo
+é Node e Express desliga as de Oracle, IIS e PHP: menos tempo de scan e menos
+falso positivo.
 
-That's why the custom `cy.apiFetch()` command uses the browser's native `fetch()`:
-
-```
-cy.request()  -->  Node.js  -->  API  (does NOT appear in the HAR)
-cy.apiFetch() -->  Browser  -->  API  (DOES appear in the HAR)
-```
-
-### Why preprocess the HAR?
-
-Cypress generates traffic for **everything**: the HTML page, CSS, JS, images, favicon, etc. If we send the raw HAR to ZAP, it will waste time scanning irrelevant static assets.
-
-The preprocessing:
-- **Removes** requests for assets (keeps only API endpoints)
-- **Removes** error responses (4xx, 5xx generate false positives)
-- **Deduplicates** endpoints (scanning `/posts` once is sufficient)
-- **Tokenizes** numeric IDs so ZAP varies values on each request
-
-### Why tokenize fields with `{{AUTO_INT}}`?
-
-During the active scan, ZAP sends hundreds of requests varying payloads. If all use `"userId": 1`, conflicts can occur. The `{{AUTO_INT}}` token is replaced by a random number on each request by ZAP's `replace_tokens.js` script.
-
-### Technology allowlist
-
-ZAP has hundreds of scan rules for various technologies (PHP, ASP.NET, MongoDB, etc.). Filtering only the technologies relevant to your stack drastically reduces scan time and decreases false positives.
-
-In this template, we filter for: `JavaScript, Node.js, Express, Nginx, Linux, Git`.
+**Tradução de caminho entre host e container.** A API de importação do ZAP
+recebe um caminho de arquivo e o abre no sistema de arquivos de quem executa o
+ZAP. Como o ZAP roda em container e o HAR é gravado no host, o caminho precisa
+ser traduzido — e o volume que faz a ponte está declarado no compose.
 
 ---
 
-## Configuration
+## O que foi corrigido em relação ao projeto de base
 
-All configuration is centralized in `security_tests/config.py`. The main options:
+Este repositório parte de um projeto anterior de automação DAST. Colocá-lo para
+rodar de ponta a ponta revelou quatro defeitos, três deles silenciosos:
 
-### ZAP Connection
+| Defeito                                        | Consequência                                                   |
+| ---------------------------------------------- | -------------------------------------------------------------- |
+| Regra de endpoint genérica vencia a específica | `PUT` e `DELETE` **nunca eram escaneados**                     |
+| Caminho de arquivo cruzando host e container   | Scan terminava com `exit 0` e **zero alertas**, sem ter rodado |
+| Nome de contexto duplicado em dois módulos     | Scan quebrava na fase 6, após cinco fases bem-sucedidas        |
+| Alvo padrão apontando para API pública         | Scan ativo contra infraestrutura de terceiros                  |
 
-| Variable | Default | Description |
-|---|---|---|
-| `ZAP_HOST` | `127.0.0.1` | Host where ZAP is running |
-| `ZAP_PORT` | `8080` | ZAP API port |
-| `ZAP_API_KEY` | `""` | API Key (configure in `.env`) |
-| `ZAP_MODE` | `standard` | ZAP mode: `safe`, `protect`, `standard`, `attack` |
-
-### Scan Policy
-
-| Variable | Default | Description |
-|---|---|---|
-| `ZAP_ATTACK_STRENGTH` | `MEDIUM` | Payload count: `LOW`, `MEDIUM`, `HIGH`, `INSANE` |
-| `ZAP_ALERT_THRESHOLD` | `LOW` | Sensitivity: `LOW` (more alerts), `MEDIUM`, `HIGH` (fewer alerts) |
-| `ZAP_THREAD_PER_HOST` | `2` | Simultaneous requests per host |
-| `ZAP_DELAY_IN_MS` | `0` | Interval between requests (useful for rate limiting) |
-| `ZAP_PSCAN_TIMEOUT_SECONDS` | `300` | Passive scan timeout |
-
-### Business Rules
-
-```python
-# Which endpoints/methods ZAP should scan
-ENDPOINT_RULES: dict[str, list[str]] = {
-    "/posts": ["GET", "POST"],
-    "/posts/": ["GET", "PUT", "DELETE"],
-    "/comments": ["GET", "POST"],
-    # ... add yours
-}
-
-# Fields whose values will be randomized by ZAP
-FIELDS_TO_TOKENIZE: list[str] = [
-    "userId",
-    "id",
-    "postId",
-]
-```
-
-### Environment Variables
-
-All settings can be overridden via environment variables or `.env`:
-
-```env
-ZAP_API_KEY=your_key_here
-ZAP_PORT=8090
-ZAP_ATTACK_STRENGTH=HIGH
-ZAP_MODE=protect
-```
+O segundo é o mais perigoso: **um scan que não rodou e um alvo sem
+vulnerabilidades produzem exatamente a mesma saída.** Só um dos dois é boa
+notícia. Hoje a importação falha de forma explícita se o ZAP não a aceitar.
 
 ---
 
-## Adapting to Your API
+## Autor
 
-### 1. Change the base URL
+**Marcos Quintino** — [github.com/MarcosQuintino0](https://github.com/MarcosQuintino0)
 
-In `cypress.env.json`:
-
-```json
-{
-  "apiUrl": "https://your-api.com",
-  "appUrl": "https://your-api.com"
-}
-```
-
-In `security_tests/config.py`:
-
-```python
-BASE_URL: str = "https://your-api.com"
-```
-
-### 2. Add authentication
-
-If your API requires authentication, add it in `cypress/support/e2e.js`:
-
-```javascript
-before(() => {
-  // Example: obtain JWT token before tests
-  cy.request("POST", "https://your-api.com/auth/login", {
-    username: "test_user",
-    password: "test_password",
-  }).then((response) => {
-    Cypress.env("authToken", response.body.token);
-  });
-
-  // ... rest of HAR setup
-});
-```
-
-And in `commands.js`, include the token in the header:
-
-```javascript
-headers: {
-  "Content-Type": "application/json",
-  "Authorization": `Bearer ${Cypress.env("authToken")}`,
-},
-```
-
-### 3. Add database cleanup
-
-For APIs that persist real data, it's important to clean state between runs:
-
-```javascript
-before(() => {
-  // Clean test data before starting
-  cy.request("POST", "https://your-api.com/admin/reset-test-data");
-
-  // ... rest of setup
-});
-
-after(() => {
-  // Clean data created during tests
-  cy.request("DELETE", "https://your-api.com/admin/cleanup");
-
-  // ... save HAR
-});
-```
-
-You can also add periodic cleanup in the Python pipeline, for example by creating a `security_tests/cleanup.py` module that runs between scan phases.
-
-### 4. Configure endpoints and rules
-
-Edit `ENDPOINT_RULES` in `config.py` to map your API's endpoints:
-
-```python
-ENDPOINT_RULES: dict[str, list[str]] = {
-    "/api/v1/products": ["GET", "POST"],
-    "/api/v1/products/": ["GET", "PUT", "DELETE"],
-    "/api/v1/orders": ["GET", "POST"],
-    "/api/v1/users": ["GET"],
-}
-```
-
-### 5. Adjust technologies
-
-If your API uses PHP + MySQL instead of Node.js:
-
-```python
-ZAP_TECH_ALLOWLIST: str = "Language.PHP,Db.MySQL,WS.Apache,OS.Linux"
-```
-
----
-
-## Technologies Used
-
-| Technology | Version | Purpose |
-|---|---|---|
-| **Cypress** | 13+ | E2E testing framework - generates real HTTP traffic |
-| **cypress-har-generator** | 5.17+ | Plugin that captures browser traffic in HAR format |
-| **Python** | 3.10+ | Core language for processing and integration |
-| **Pydantic Settings** | 2.7+ | Typed configuration with validation and `.env` support |
-| **Loguru** | 0.7+ | Structured and colorful logging |
-| **zaproxy** | 0.5+ | Python client for the OWASP ZAP API |
-| **OWASP ZAP** | 2.14+ | Open-source DAST scanner maintained by OWASP |
-
----
-
-## License
-
-This project is an educational template. Use, modify, and distribute freely.
+Licenciado sob [MIT](LICENSE).
