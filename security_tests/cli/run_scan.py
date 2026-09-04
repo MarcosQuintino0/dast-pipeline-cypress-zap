@@ -24,6 +24,7 @@ PREREQUISITES:
 
 from loguru import logger
 
+from security_tests.config import assert_target_is_allowed, settings
 from security_tests.zap_scan.zap_client import (
     create_zap_client,
     test_connection,
@@ -57,6 +58,16 @@ def main() -> None:
     logger.info("=" * 60)
     logger.info("STARTING DAST SECURITY SCAN")
     logger.info("=" * 60)
+
+    # === PHASE 0: Safety guard ===
+    # Runs before anything touches the network. An active scan fires real
+    # attack payloads, so pointing this pipeline at a host that is not yours
+    # is the difference between a security exercise and an incident. A typo in
+    # one environment variable is enough to cross that line, which is why the
+    # check is here and not in a README warning.
+    assert_target_is_allowed(settings.TARGET_URL)
+    assert_target_is_allowed(settings.TARGET_URL_FROM_ZAP)
+    logger.info(f"Target allowed: {settings.TARGET_URL}")
 
     # === PHASE 1: Connection and Setup ===
     logger.info("--- PHASE 1: Connection and Setup ---")
