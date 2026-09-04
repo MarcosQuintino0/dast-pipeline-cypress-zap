@@ -31,3 +31,6 @@ docs/assets/.tmp/
 
 .DS_Store
 Thumbs.db
+
+# Trabalho intermediario da geracao de evidencias
+scratchpad/
