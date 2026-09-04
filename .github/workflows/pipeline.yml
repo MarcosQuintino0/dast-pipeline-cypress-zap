@@ -1,0 +1,120 @@
+name: Pipeline
+
+# Duas camadas, separadas pelo que cada uma custa.
+#
+# A verificacao estatica e os testes de unidade rodam em todo push e pull
+# request: sao segundos e cobrem a logica que decide o que sera atacado.
+#
+# O pipeline DAST completo sobe alvo e scanner em container e leva minutos.
+# Roda no push para main e sob demanda, e nao a cada commit de rascunho.
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  qualidade:
+    name: Lint, formatacao e testes de unidade
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install pytest ruff
+
+      - name: Ruff (lint)
+        run: ruff check .
+
+      - name: Ruff (formatacao)
+        run: ruff format --check .
+
+      - name: Testes de unidade
+        run: pytest
+
+  dast:
+    name: Pipeline DAST completo
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    # So faz sentido gastar minutos de runner com o scan se a logica que decide
+    # o que sera atacado ja estiver verde.
+    needs: qualidade
+    if: github.event_name != 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+
+      - name: Instalar dependencias
+        run: |
+          npm ci
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Preparar configuracao
+        run: |
+          cp .env.example .env
+          cp cypress.env.example.json cypress.env.json
+
+      - name: Subir alvo e OWASP ZAP
+        run: |
+          docker compose up -d --build
+          node scripts/wait-for-environment.mjs
+
+      # Fase 1: os testes funcionais geram o trafego que alimenta o scan.
+      # Falha aqui interrompe tudo: sem trafego valido nao ha o que escanear, e
+      # um scan sobre trafego incompleto produz relatorio limpo por omissao.
+      - name: Testes Cypress
+        run: npx cypress run --browser chrome
+
+      # Fase 2: filtra, deduplica e tokeniza o trafego capturado.
+      - name: Processar o trafego
+        run: python -m security_tests.cli.process_har
+
+      # Fase 3: scan passivo e ativo com o OWASP ZAP.
+      - name: Scan de seguranca
+        run: python -m security_tests.cli.run_scan
+
+      - name: Publicar relatorio e evidencias
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: relatorio-dast
+          path: |
+            security_tests/reports/
+            security_tests/traffic/filtered_traffic.har
+            cypress/screenshots/
+          retention-days: 30
+
+      - name: Diagnostico quando algo falha
+        if: failure()
+        run: |
+          echo "=== containers ==="
+          docker compose ps
+          echo "=== logs ==="
+          docker compose logs --tail=80
